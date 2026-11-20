@@ -32,6 +32,8 @@ this engine (measured 2026-11-21, Rust 1.100.0):
   anywhere). The host toolchain stays `x86_64-pc-windows-gnu`, which is
   enough for build scripts and proc macros.
 - On GitHub's Windows runner, which has Microsoft's tools: the MSVC target.
+  (Since 0012, CI runs on our own runner, which has no Microsoft tools: it
+  builds `gnullvm` too, so no MSVC build is checked.)
 - No crate that needs a C compiler is let in (none is needed today).
 
 ## Why
@@ -45,5 +47,6 @@ bench and the C interface all ran from it (`docs/M0.md`).
 Shipping inside the app's installer (M5), where the MSVC target is the
 ordinary choice: PDBs for crash reports, the toolchain every Windows library
 is tested with. Install the build tools on the PC that builds releases and
-drop `tools/env-windows.sh` from that build; no code changes are expected:
-CI's Windows job builds the MSVC target.
+drop `tools/env-windows.sh` from that build; no code changes are expected,
+but nothing proves that while CI builds `gnullvm` (0012): that PC's first
+build is the MSVC target's first.
