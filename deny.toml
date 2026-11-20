@@ -1,0 +1,34 @@
+# Licences and advisories for everything the engine is built from.
+# The plan (polyglotic-hq 520, section 10): MIT, Apache-2.0, BSD, ISC, Zlib,
+# Unicode only.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+
+[licenses]
+version = 2
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+]
+
+# cbindgen (MPL-2.0) writes the C header in a test. It is a dev-dependency,
+# which cargo-deny leaves out: no part of it is in the engine that ships.
+
+# Our own crates carry no SPDX licence: they are not published.
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

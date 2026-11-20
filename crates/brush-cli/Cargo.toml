@@ -1,0 +1,20 @@
+[package]
+name = "brush-cli"
+description = "The engine from the command line: benchmarks and M0's measurements."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "brush"
+path = "src/main.rs"
+
+[dependencies]
+brush-engine = { workspace = true }
+brush-host = { workspace = true }
+wgpu = { workspace = true }
+
+[lints]
+workspace = true
