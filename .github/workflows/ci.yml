@@ -1,0 +1,85 @@
+name: CI
+
+# GitHub's own runners. The repository is private, so these use the account's
+# Actions minutes: Linux for everything that needs no window (1x minutes), and
+# Windows (2x) only on main and by hand, for the overlay's code.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  checks:
+    name: Checks (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust (the pinned toolchain)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Format
+        run: cargo fmt --all --check
+      - name: brush-core depends on nothing
+        run: test "$(cargo tree -p brush-core --edges normal | wc -l)" = 1
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: Docs
+        run: cargo doc --workspace --no-deps --locked
+
+  licences:
+    name: Licences and advisories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  windows:
+    name: Checks (Windows)
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust (the pinned toolchain, GNU)
+        shell: bash
+        run: |
+          rustup set default-host x86_64-pc-windows-gnu
+          rustup show active-toolchain || rustup toolchain install
+          echo "$(rustc --print sysroot)/lib/rustlib/x86_64-pc-windows-gnu/bin/self-contained" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: The command-line tool builds
+        run: cargo build --release -p brush-cli --locked

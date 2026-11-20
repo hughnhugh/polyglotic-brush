@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.100"
+license = "LicenseRef-Polyglotic-Proprietary"
+publish = false
+
+[workspace.dependencies]
+wgpu = { version = "30.0.2", default-features = false, features = ["dx12", "vulkan", "wgsl"] }
+bytemuck = { version = "1.25", features = ["derive"] }
+pollster = "1.0"
+brush-core = { path = "crates/brush-core" }
+brush-sim = { path = "crates/brush-sim" }
+brush-look = { path = "crates/brush-look" }
+brush-engine = { path = "crates/brush-engine" }
+brush-host = { path = "crates/brush-host" }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true
