@@ -46,8 +46,7 @@ impl FlowSim {
             })
         };
         let write = |t: &wgpu::Texture, cells: &[[f32; 4]]| {
-            let bytes: Vec<u8> =
-                cells.iter().flatten().flat_map(|&v| half::from_f32(v).to_le_bytes()).collect();
+            let bytes: Vec<u8> = cells.iter().flatten().flat_map(|&v| half::from_f32(v).to_le_bytes()).collect();
             queue.write_texture(
                 t.as_image_copy(),
                 &bytes,
@@ -95,8 +94,10 @@ impl FlowSim {
             })
         });
 
-        let module = device
-            .create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("flow"), source: wgpu::ShaderSource::Wgsl(FLOW.into()) });
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("flow"),
+            source: wgpu::ShaderSource::Wgsl(FLOW.into()),
+        });
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("flow"),
             layout: None,
@@ -116,11 +117,17 @@ impl FlowSim {
             let mut entries: Vec<wgpu::BindGroupEntry<'_>> = Vec::with_capacity(10);
             let all = views[from].iter().chain(std::iter::once(&paper)).chain(views[to].iter());
             for (binding, view) in all.enumerate() {
-                entries
-                    .push(wgpu::BindGroupEntry { binding: binding as u32, resource: wgpu::BindingResource::TextureView(view) });
+                entries.push(wgpu::BindGroupEntry {
+                    binding: binding as u32,
+                    resource: wgpu::BindingResource::TextureView(view),
+                });
             }
             entries.push(wgpu::BindGroupEntry { binding: 9, resource: wgpu::BindingResource::Sampler(&sampler) });
-            device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some("flow step"), layout: &layout, entries: &entries })
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("flow step"),
+                layout: &layout,
+                entries: &entries,
+            })
         };
         let steps = [step(0, 1), step(1, 0)];
         Self { n, pipeline, steps, views, paper, done: 0 }

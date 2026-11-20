@@ -38,8 +38,10 @@ impl LitPaper {
             view_formats: &[],
         });
         let view = picture.create_view(&wgpu::TextureViewDescriptor::default());
-        let module = device
-            .create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("look"), source: wgpu::ShaderSource::Wgsl(LOOK.into()) });
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("look"),
+            source: wgpu::ShaderSource::Wgsl(LOOK.into()),
+        });
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("look"),
             layout: None,
@@ -98,8 +100,10 @@ impl PointerInk {
     /// Ink for a target of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let module = device
-            .create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("ink"), source: wgpu::ShaderSource::Wgsl(INK.into()) });
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("ink"),
+            source: wgpu::ShaderSource::Wgsl(INK.into()),
+        });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("ink"),
             layout: None,
@@ -156,7 +160,14 @@ impl PointerInk {
 
     /// Replace what is drawn: `vertices` are `[x, y, ink]` in window pixels,
     /// three to a triangle. `colour` is straight (not premultiplied) RGBA.
-    pub fn set(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, vertices: &[[f32; 3]], size: [f32; 2], colour: [f32; 4]) {
+    pub fn set(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        vertices: &[[f32; 3]],
+        size: [f32; 2],
+        colour: [f32; 4],
+    ) {
         let bytes: &[u8] = bytemuck::cast_slice(vertices);
         if bytes.len() as u64 > self.capacity {
             self.capacity = (bytes.len() as u64).next_power_of_two();

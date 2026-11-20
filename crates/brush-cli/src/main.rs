@@ -81,7 +81,13 @@ fn bench(args: &mut Args) -> Result<(), String> {
 }
 
 /// Bench the chosen adapters into `report`.
-pub(crate) fn bench_into(report: &mut Report, all: bool, name: Option<&str>, grids: &[u32], budget: Duration) -> Result<(), String> {
+pub(crate) fn bench_into(
+    report: &mut Report,
+    all: bool,
+    name: Option<&str>,
+    grids: &[u32],
+    budget: Duration,
+) -> Result<(), String> {
     let instance = brush_engine::gpu::instance(wgpu::Backends::all());
     let every = brush_engine::gpu::adapters(&instance);
     let wanted: Vec<&wgpu::Adapter> = if all {
@@ -112,7 +118,7 @@ pub(crate) fn bench_into(report: &mut Report, all: bool, name: Option<&str>, gri
         for &n in grids {
             let row = brush_engine::bench(&device, &queue, n, budget);
             report.line(format!(
-                "  {n} x {n}: flow step {:.3} ms; flow + lit picture {:.3} ms; steps in half a frame: {:.1} at 60 Hz, {:.1} at 120 Hz ({} steps a run; inked {:.4})",
+                "  {n} x {n}: flow step {:.3} ms; flow + lit picture {:.3} ms; steps in half a frame: {:.1} at 60 Hz, {:.1} at 120 Hz ({} steps a run; dark pixels {:.4})",
                 row.flow_ms,
                 row.both_ms,
                 row.steps_per_frame(60.0),

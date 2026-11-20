@@ -61,7 +61,9 @@ impl Args {
             None => Ok(None),
             Some(word) => word
                 .split(',')
-                .map(|part| part.trim().parse::<T>().map_err(|_| format!("{name} wants numbers with commas, not '{word}'")))
+                .map(|part| {
+                    part.trim().parse::<T>().map_err(|_| format!("{name} wants numbers with commas, not '{word}'"))
+                })
                 .collect::<Result<Vec<T>, String>>()
                 .map(Some),
         }

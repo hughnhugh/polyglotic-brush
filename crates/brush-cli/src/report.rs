@@ -14,7 +14,11 @@ pub struct Report {
 impl Report {
     pub fn new(title: &str, out: Option<String>) -> Self {
         let mut report = Self { lines: Vec::new(), out };
-        report.line(format!("{title} {} (interface {})", env!("CARGO_PKG_VERSION"), brush_host::ffi::BRUSH_ABI_VERSION));
+        report.line(format!(
+            "{title} {} (interface {})",
+            env!("CARGO_PKG_VERSION"),
+            brush_host::ffi::BRUSH_ABI_VERSION
+        ));
         report
     }
 

@@ -12,23 +12,15 @@ version = 2
 version = 2
 allow = [
   "MIT",
-  "MIT-0",
   "Apache-2.0",
-  "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
-  "BSD-3-Clause",
   "ISC",
   "Zlib",
   "Unicode-3.0",
-  "BSL-1.0",
-  "CC0-1.0",
 ]
 
-# cbindgen (MPL-2.0) writes the C header in a test. It is a tool: no part of
-# it is in the engine that ships.
-[[licenses.exceptions]]
-crate = "cbindgen"
-allow = ["MPL-2.0"]
+# cbindgen (MPL-2.0) writes the C header in a test. It is a dev-dependency,
+# which cargo-deny leaves out: no part of it is in the engine that ships.
 
 # Our own crates carry no SPDX licence: they are not published.
 [licenses.private]

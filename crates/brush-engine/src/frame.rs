@@ -32,7 +32,13 @@ impl Engine {
             let look = LitPaper::new(device, n, sim.paper(), sim.sides());
             (sim, look)
         });
-        Self { ink: PointerInk::new(device, format), sim, strokes: Vec::new(), changed: true, backdrop: wgpu::Color::TRANSPARENT }
+        Self {
+            ink: PointerInk::new(device, format),
+            sim,
+            strokes: Vec::new(),
+            changed: true,
+            backdrop: wgpu::Color::TRANSPARENT,
+        }
     }
 
     /// Start a new stroke; samples added next belong to it.

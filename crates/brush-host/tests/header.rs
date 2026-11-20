@@ -29,6 +29,7 @@ fn the_header_is_current() {
 
     let path = dir.join("../../include/brush_host.h");
     if std::env::var_os("BRUSH_WRITE_HEADER").is_some() {
+        std::fs::create_dir_all(dir.join("../../include")).expect("the include folder is made");
         std::fs::write(&path, &made).expect("the header is written");
     }
     let kept = std::fs::read_to_string(&path).unwrap_or_default().replace("\r\n", "\n");

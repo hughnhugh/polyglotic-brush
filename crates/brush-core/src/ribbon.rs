@@ -93,9 +93,8 @@ mod tests {
 
     #[test]
     fn the_ribbon_never_reaches_further_than_half_its_width_from_the_samples() {
-        let samples: Vec<Sample> = (0..40)
-            .map(|i| at(i as f32 * 7.0, if i % 2 == 0 { 0.0 } else { 30.0 }, (i % 5) as f32 / 4.0))
-            .collect();
+        let samples: Vec<Sample> =
+            (0..40).map(|i| at(i as f32 * 7.0, if i % 2 == 0 { 0.0 } else { 30.0 }, (i % 5) as f32 / 4.0)).collect();
         for v in ribbon(&samples, 1.0, 12.0) {
             let near = samples.iter().any(|s| {
                 let (x, y) = s.pixels();

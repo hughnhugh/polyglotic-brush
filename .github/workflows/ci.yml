@@ -2,7 +2,7 @@ name: CI
 
 # GitHub's own runners. The repository is private, so these use the account's
 # Actions minutes: Linux for everything that needs no window (1x minutes), and
-# Windows (2x) only on main and by hand, for the overlay's code.
+# Windows (2x) for the overlay's code.
 on:
   pull_request:
   push:
@@ -59,17 +59,14 @@ jobs:
 
   windows:
     name: Checks (Windows)
-    if: github.event_name != 'pull_request'
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Rust (the pinned toolchain, GNU)
-        shell: bash
-        run: |
-          rustup set default-host x86_64-pc-windows-gnu
-          rustup show active-toolchain || rustup toolchain install
-          echo "$(rustc --print sysroot)/lib/rustlib/x86_64-pc-windows-gnu/bin/self-contained" >> "$GITHUB_PATH"
+      # GitHub's Windows runner has Microsoft's build tools, so this job builds
+      # for the MSVC target: the same code, the ordinary Windows toolchain.
+      - name: Rust (the pinned toolchain)
+        run: rustup show active-toolchain || rustup toolchain install
       - uses: actions/cache@v4
         with:
           path: |

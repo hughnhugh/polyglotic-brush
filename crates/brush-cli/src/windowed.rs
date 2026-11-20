@@ -66,7 +66,9 @@ pub fn overlay(args: &mut Args) -> Result<(), String> {
     let script = args.flag("--script");
     let options = Options { owner, rect, input, on_top: true, sim, adapter: args.value("--adapter"), tint };
     let mut report = Report::new("brush overlay", args.value("--out"));
-    report.line(format!("asked: owner {owner} rect {rect:?} input {input:?} sim {sim:?} script {script} for {seconds} s"));
+    report.line(format!(
+        "asked: owner {owner} rect {rect:?} input {input:?} sim {sim:?} script {script} for {seconds} s"
+    ));
     let overlay = Overlay::open(options)?;
     report.line(format!("canvas window: {}", overlay.hwnd()));
     hold(&overlay, (rect.2, rect.3), seconds, script);
@@ -100,6 +102,20 @@ pub fn floor(args: &mut Args) -> Result<(), String> {
     report.line("== 1. the simulation on every adapter ==".into());
     crate::bench_into(&mut report, true, None, &[512, 1024, 2048], Duration::from_millis(3000))?;
 
+    // The floor is the integrated adapter: draw the canvas with it when there
+    // is one, even beside a faster card.
+    let instance = brush_engine::gpu::instance(wgpu::Backends::DX12);
+    let integrated = brush_engine::gpu::adapters(&instance)
+        .iter()
+        .map(wgpu::Adapter::get_info)
+        .find(|info| info.device_type == wgpu::DeviceType::IntegratedGpu)
+        .map(|info| info.name);
+    drop(instance);
+    match &integrated {
+        Some(name) => report.line(format!("the canvas is drawn by the integrated adapter: {name}")),
+        None => report.line("no integrated adapter here: the canvas is drawn by the system's choice".into()),
+    }
+
     let rect = (120, 120, 960, 360);
     let runs: [(&str, Option<(u32, u32)>); 3] = [
         ("== 2. the canvas alone, 6 seconds ==", None),
@@ -108,7 +124,8 @@ pub fn floor(args: &mut Args) -> Result<(), String> {
     ];
     for (title, sim) in runs {
         report.line(title.into());
-        let options = Options { rect, input: Input::Off, sim, tint: 0.14, ..Options::default() };
+        let options =
+            Options { rect, input: Input::Off, sim, tint: 0.14, adapter: integrated.clone(), ..Options::default() };
         match Overlay::open(options) {
             Ok(overlay) => {
                 hold(&overlay, (rect.2, rect.3), 6.0, true);

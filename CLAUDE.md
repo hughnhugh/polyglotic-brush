@@ -19,6 +19,6 @@ Polyglotic's canvas engine (Rust, wgpu). Read `ARCHITECTURE.md` and
   (`cargo build -j 4`); GPU runs last seconds, because the same card serves
   the live captions; a window that needs a screen runs on a private desktop
   (polyglotic-desktop's `tools/private_desktop.py`), never on the user's.
-- **The toolchain** is pinned in `rust-toolchain.toml`. On Windows it is the
-  GNU one and needs its `self-contained` folder on PATH (README).
+- **The toolchain** is pinned in `rust-toolchain.toml`. On a Windows PC
+  without Microsoft's build tools, source `tools/env-windows.sh` first (README).
 - Plain language; absolute dates.

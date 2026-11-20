@@ -100,7 +100,7 @@ fn dark_share(device: &wgpu::Device, queue: &wgpu::Queue, picture: &wgpu::Textur
     };
     let dark = bytes
         .chunks_exact(row as usize)
-        .flat_map(|line| line[..(n * 4) as usize].chunks_exact(4))
+        .flat_map(|line| line[..(n * 4) as usize].as_chunks::<4>().0)
         .filter(|pixel| pixel[0] < 128)
         .count();
     dark as f64 / f64::from(n) / f64::from(n)

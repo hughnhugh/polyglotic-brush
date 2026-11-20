@@ -36,11 +36,11 @@ use windows::Win32::UI::Input::Pointer::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetWindowLongPtrW, IsWindow, PeekMessageW,
     PostMessageW, RegisterClassW, SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, CREATESTRUCTW,
-    GWLP_USERDATA, GWL_EXSTYLE, HWND_TOPMOST, MA_NOACTIVATE, MSG, PM_REMOVE, PT_PEN, PT_TOUCH, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE, WM_APP, WM_DESTROY, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCREATE, WM_POINTERDOWN, WM_POINTERUP, WM_POINTERUPDATE,
-    WM_RBUTTONUP, WM_SIZE, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    GWLP_USERDATA, GWL_EXSTYLE, HWND_TOPMOST, MA_NOACTIVATE, MSG, PM_NOREMOVE, PM_REMOVE, PT_PEN, PT_TOUCH,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WM_APP,
+    WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCREATE, WM_POINTERDOWN,
+    WM_POINTERUP, WM_POINTERUPDATE, WM_RBUTTONUP, WM_SIZE, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 use crate::stats::Stats;
@@ -74,7 +74,15 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Self { owner: 0, rect: (100, 100, 800, 300), input: Input::Off, on_top: true, sim: None, adapter: None, tint: 0.0 }
+        Self {
+            owner: 0,
+            rect: (100, 100, 800, 300),
+            input: Input::Off,
+            on_top: true,
+            sim: None,
+            adapter: None,
+            tint: 0.0,
+        }
     }
 }
 
@@ -86,6 +94,7 @@ const WM_BRUSH_SAMPLE: u32 = WM_APP + 1;
 const WM_BRUSH_INPUT: u32 = WM_APP + 2;
 const WM_BRUSH_RECT: u32 = WM_APP + 3;
 const WM_BRUSH_CLOSE: u32 = WM_APP + 4;
+const WM_BRUSH_SHOW: u32 = WM_APP + 5;
 
 /// What the host's threads and the canvas's thread share.
 #[derive(Debug, Default)]
@@ -127,10 +136,18 @@ impl Overlay {
                 }
             })
             .map_err(|e| format!("the canvas's thread didn't start: {e}"))?;
-        match is_ready.recv() {
-            Ok(Ok(())) => Ok(Self { shared, thread: Some(thread) }),
-            Ok(Err(why)) => Err(why),
-            Err(_) => Err("the canvas's thread ended before its window was up".into()),
+        // The canvas's window is owned by the host's, and Windows sends the
+        // owner's thread messages while it is made. If that thread is the one
+        // waiting here, it must keep answering them, or both wait for ever.
+        loop {
+            match is_ready.try_recv() {
+                Ok(Ok(())) => return Ok(Self { shared, thread: Some(thread) }),
+                Ok(Err(why)) => return Err(why),
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    return Err("the canvas's thread ended before its window was up".into())
+                }
+                Err(mpsc::TryRecvError::Empty) => answer_sent_messages(),
+            }
         }
     }
 
@@ -150,6 +167,13 @@ impl Overlay {
     /// Take the pen and the mouse, or let them through.
     pub fn set_input(&self, input: Input) {
         self.post(WM_BRUSH_INPUT, usize::from(input == Input::On), 0);
+    }
+
+    /// Show or hide the canvas. Windows hides an owned window only when its
+    /// owner is minimised, so a host that hides its window says so here. A
+    /// hidden canvas draws nothing.
+    pub fn set_visible(&self, visible: bool) {
+        self.post(WM_BRUSH_SHOW, usize::from(visible), 0);
     }
 
     /// Move and size the canvas, in screen pixels.
@@ -190,6 +214,10 @@ impl Overlay {
     fn shut(&mut self) {
         if let Some(thread) = self.thread.take() {
             self.post(WM_BRUSH_CLOSE, 0, 0);
+            // As in `open`: destroying an owned window can send to this thread.
+            while !thread.is_finished() {
+                answer_sent_messages();
+            }
             let _ = thread.join();
         }
     }
@@ -199,6 +227,16 @@ impl Drop for Overlay {
     fn drop(&mut self) {
         self.shut();
     }
+}
+
+/// Let this thread answer messages other threads have *sent* it (posted ones
+/// stay in its queue for the host's own loop), then rest a millisecond.
+fn answer_sent_messages() {
+    let mut message = MSG::default();
+    // SAFETY: `message` is a live local. With PM_NOREMOVE nothing is taken
+    // from the queue; the call's effect is to run pending sent messages.
+    let _ = unsafe { PeekMessageW(&mut message, None, 0, 0, PM_NOREMOVE) };
+    std::thread::sleep(std::time::Duration::from_millis(1));
 }
 
 /// The performance counter now.
@@ -236,6 +274,7 @@ struct Window {
     stroke_began: i64,
     resized: Option<(u32, u32)>,
     close: bool,
+    hidden: bool,
     pen: u64,
     mouse: u64,
     touch: u64,
@@ -259,7 +298,7 @@ fn widen<T: Copy + PartialOrd>(range: &mut Option<(T, T)>, value: T) {
 
 impl Window {
     /// Take one reading at a point in the window. `contact` false ends the stroke.
-    fn take(&mut self, x: f32, y: f32, pressure: f32, tilt: (f32, f32), at: i64, source: Source, contact: bool) {
+    fn take(&mut self, (x, y): (f32, f32), pressure: f32, tilt: (f32, f32), at: i64, source: Source, contact: bool) {
         if !contact {
             self.drawing = false;
             self.pen_last = None;
@@ -325,7 +364,7 @@ fn pointer(hwnd: HWND, window: &mut Window, wparam: WPARAM) -> bool {
                 window.pen_last = Some(at);
             }
             let pressure = info.pressure as f32 / 1024.0;
-            window.take(x, y, pressure, (info.tiltX as f32, info.tiltY as f32), at, Source::Pen, contact);
+            window.take((x, y), pressure, (info.tiltX as f32, info.tiltY as f32), at, Source::Pen, contact);
         }
         return true;
     }
@@ -338,7 +377,7 @@ fn pointer(hwnd: HWND, window: &mut Window, wparam: WPARAM) -> bool {
         let contact = info.pointerFlags.0 & POINTER_FLAG_INCONTACT.0 != 0;
         let (x, y) = client(info.ptPixelLocation);
         window.touch += u64::from(contact);
-        window.take(x, y, 0.5, (0.0, 0.0), info.PerformanceCount as i64, Source::Touch, contact);
+        window.take((x, y), 0.5, (0.0, 0.0), info.PerformanceCount as i64, Source::Touch, contact);
         return true;
     }
     false
@@ -384,7 +423,7 @@ unsafe extern "system" fn messages(hwnd: HWND, message: u32, wparam: WPARAM, lpa
             }
             let (x, y) = point(lparam);
             window.mouse += u64::from(down);
-            window.take(x, y, 0.5, (0.0, 0.0), now(), Source::Mouse, down);
+            window.take((x, y), 0.5, (0.0, 0.0), now(), Source::Mouse, down);
             return LRESULT(0);
         }
         WM_BRUSH_SAMPLE => {
@@ -393,7 +432,7 @@ unsafe extern "system" fn messages(hwnd: HWND, message: u32, wparam: WPARAM, lpa
             let pressure = (wparam.0 >> 1) as f32 / 65535.0;
             let (x, y) = point(lparam);
             window.injected += u64::from(down);
-            window.take(x, y, pressure, (0.0, 0.0), posted.unwrap_or_else(now), Source::Mouse, down);
+            window.take((x, y), pressure, (0.0, 0.0), posted.unwrap_or_else(now), Source::Mouse, down);
             return LRESULT(0);
         }
         WM_BRUSH_INPUT => {
@@ -406,6 +445,12 @@ unsafe extern "system" fn messages(hwnd: HWND, message: u32, wparam: WPARAM, lpa
                 let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED;
                 let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, flags);
             }
+            return LRESULT(0);
+        }
+        WM_BRUSH_SHOW => {
+            window.hidden = wparam.0 == 0;
+            // SAFETY: `hwnd` is this thread's window.
+            let _ = unsafe { ShowWindow(hwnd, if window.hidden { SW_HIDE } else { SW_SHOWNOACTIVATE }) };
             return LRESULT(0);
         }
         WM_BRUSH_RECT => {
@@ -623,10 +668,21 @@ fn frames(
     let mut first_counts: Option<(u32, u32)> = None;
 
     loop {
+        if state.borrow().hidden {
+            // Nothing to draw: wait for messages without touching the GPU.
+            pump();
+            if state.borrow().close {
+                break;
+            }
+            last_present = None;
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            continue;
+        }
         let asked = now();
         let frame = match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => Some(frame),
             wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                drop(chain.take());
                 surface.configure(&device, &config);
                 chain = swap_chain(&surface);
                 None
@@ -663,6 +719,8 @@ fn frames(
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
         let commands = engine.frame(&device, &queue, &view, (config.width, config.height), sim_steps);
         queue.submit([commands]);
+        // The view holds the swap chain's buffer, which a resize must find free.
+        drop(view);
         queue.present(frame);
         let presented = now();
 
@@ -710,9 +768,12 @@ fn frames(
             stats.input_to_sync.push_micros(s);
         }
         if let Some((presents, refreshes)) = counts {
-            let (p0, r0) = *first_counts.get_or_insert((presents, refreshes));
-            stats.dxgi_presents = Some(presents.wrapping_sub(p0));
-            stats.dxgi_refreshes = Some(refreshes.wrapping_sub(r0));
+            // DXGI's counters read zero until the first frame has been shown.
+            if refreshes > 0 {
+                let (p0, r0) = *first_counts.get_or_insert((presents, refreshes));
+                stats.dxgi_presents = Some(presents.wrapping_sub(p0));
+                stats.dxgi_refreshes = Some(refreshes.wrapping_sub(r0));
+            }
         }
         {
             let window = state.borrow();
@@ -733,6 +794,7 @@ fn frames(
             if (w, h) != (config.width, config.height) {
                 config.width = w;
                 config.height = h;
+                drop(chain.take());
                 surface.configure(&device, &config);
                 chain = swap_chain(&surface);
                 engine.resized();

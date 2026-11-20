@@ -75,7 +75,14 @@ pub extern "C" fn brush_abi_version() -> u32 {
 /// screen pixels, with `input` one of `BRUSH_INPUT_*`.
 /// Returns null when it can't be opened (and always, off Windows).
 #[no_mangle]
-pub extern "C" fn brush_canvas_create(owner: isize, x: i32, y: i32, width: i32, height: i32, input: u32) -> *mut BrushCanvas {
+pub extern "C" fn brush_canvas_create(
+    owner: isize,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    input: u32,
+) -> *mut BrushCanvas {
     #[cfg(windows)]
     {
         use crate::overlay::{Input, Options, Overlay};
@@ -128,6 +135,23 @@ pub unsafe extern "C" fn brush_canvas_set_rect(canvas: *const BrushCanvas, x: i3
     canvas.overlay.set_rect((x, y, width, height));
     #[cfg(not(windows))]
     let _ = (canvas, x, y, width, height);
+}
+
+/// Show the canvas (`visible` true) or hide it. A host that hides its own
+/// window hides the canvas too: Windows does not do it for an owned window.
+///
+/// # Safety
+/// `canvas` is null or a pointer from `brush_canvas_create` not yet destroyed.
+#[no_mangle]
+pub unsafe extern "C" fn brush_canvas_set_visible(canvas: *const BrushCanvas, visible: bool) {
+    // SAFETY: the caller's contract above.
+    let Some(canvas) = (unsafe { canvas.as_ref() }) else {
+        return;
+    };
+    #[cfg(windows)]
+    canvas.overlay.set_visible(visible);
+    #[cfg(not(windows))]
+    let _ = (canvas, visible);
 }
 
 /// Take the pen and the mouse (`BRUSH_INPUT_ON`) or let them through.
@@ -196,6 +220,7 @@ mod tests {
             assert_eq!(brush_canvas_window(std::ptr::null()), 0);
             brush_canvas_set_rect(std::ptr::null(), 0, 0, 1, 1);
             brush_canvas_set_input(std::ptr::null(), BRUSH_INPUT_ON);
+            brush_canvas_set_visible(std::ptr::null(), false);
             let mut stats = BrushStats::default();
             assert!(!brush_canvas_stats(std::ptr::null(), &mut stats));
             brush_canvas_destroy(std::ptr::null_mut());
@@ -205,7 +230,8 @@ mod tests {
 
     #[test]
     fn stats_cross_as_microseconds() {
-        let mut stats = crate::Stats { frames: 3, pen_samples: 2, mouse_samples: 1, refresh_hz: 59.94, ..Default::default() };
+        let mut stats =
+            crate::Stats { frames: 3, pen_samples: 2, mouse_samples: 1, refresh_hz: 59.94, ..Default::default() };
         for micros in [16_600, 16_700, 16_800] {
             stats.frame_interval.push_micros(micros);
         }

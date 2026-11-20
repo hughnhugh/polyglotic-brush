@@ -19,21 +19,24 @@ cost on real graphics cards, and the pen's delay. No brush yet.
 Rust comes from [rustup](https://rustup.rs), at user level; the version is
 pinned in `rust-toolchain.toml` and rustup fetches it on the first build.
 
-On Windows the toolchain is the GNU one (`docs/decisions/0011`): no
-Microsoft build tools are needed, but the toolchain's own linker tools have
-to be on PATH. Once per shell:
+On Windows, with Microsoft's C++ build tools installed, nothing more is
+needed. Without them (they need an administrator; the main PC has none),
+build for the `gnullvm` target with llvm-mingw, which unpacks anywhere
+(`docs/decisions/0011`):
 
 ```
-rustup set default-host x86_64-pc-windows-gnu
-export PATH="$(rustc --print sysroot)/lib/rustlib/x86_64-pc-windows-gnu/bin/self-contained:$PATH"
+rustup target add x86_64-pc-windows-gnullvm
+export LLVM_MINGW=/c/path/to/llvm-mingw-20261117-ucrt-x86_64   # github.com/mstorsjo/llvm-mingw
+. tools/env-windows.sh
 ```
 
-(Git Bash; in PowerShell, `$env:PATH = "$(rustc --print sysroot)\lib\rustlib\x86_64-pc-windows-gnu\bin\self-contained;$env:PATH"`.)
-Without it the build stops at `error calling dlltool 'dlltool.exe': program not found`.
+Output then lands under `target/x86_64-pc-windows-gnullvm/`. Don't build the
+plain `x86_64-pc-windows-gnu` target: without a full MinGW its binaries
+either fail to link (`dlltool.exe: program not found`) or crash at start.
 
 ```
-cargo build --release -p brush-cli      # target/release/brush.exe
-cargo build --release -p brush-host     # target/release/brush_host.dll, for a host app
+cargo build --release -p brush-cli      # .../release/brush.exe
+cargo build --release -p brush-host     # .../release/brush_host.dll, for a host app
 ```
 
 ## Check
