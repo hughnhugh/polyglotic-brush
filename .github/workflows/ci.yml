@@ -1,8 +1,14 @@
 name: CI
 
-# GitHub's own runners. The repository is private, so these use the account's
-# Actions minutes: Linux for everything that needs no window (1x minutes), and
-# Windows (2x) for the overlay's code.
+# On our own runner: `gpubox-brush`, a service on the second PC (gpubox),
+# registered to this repository alone (docs/decisions/0012). GitHub's own
+# machines would cost money for a private repository, and the account's
+# spending limit is 0.
+#
+# Linux is not checked. No Linux runner of ours exists yet, and this workflow
+# never asks for GitHub's paid machines. The checks that were Linux-only
+# (format, the dependency rule, docs, cargo-deny) run in the Windows job; a
+# Linux build and its tests wait for a runner we own.
 on:
   pull_request:
   push:
@@ -19,64 +25,78 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTDOCFLAGS: -D warnings
+  # At most 4 compilers at once; every step from the gate on runs at Idle
+  # priority (tools/ci/gpubox-gate.ps1).
+  CARGO_BUILD_JOBS: 4
+  # The toolchain beside rust-toolchain.toml, installed into the runner's tool
+  # cache by tools/ci/windows-toolchain.ps1 and checked against these hashes.
+  RUSTUP_VERSION: 1.29.3
+  RUSTUP_INIT_SHA256: f6289656ce42e1099f3cbc6f10ef6321dfde54773faf599dd36fd3b1f07d9103
+  LLVM_MINGW_RELEASE: "20261117"
+  LLVM_MINGW_SHA256: 4d002e330a0f703625aa5ccbc37e96f8f824413e163bfc7336774aabd2c3a412
+  CARGO_DENY_VERSION: 0.22.0
+  CARGO_DENY_SHA256: a85b270b4aa28633d2cb2be97fccd4518ccb783014914e99463e75468cb3183c
 
 jobs:
-  checks:
-    name: Checks (Linux)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: Rust (the pinned toolchain)
-        run: rustup show active-toolchain || rustup toolchain install
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: linux-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Format
-        run: cargo fmt --all --check
-      - name: brush-core depends on nothing
-        run: test "$(cargo tree -p brush-core --edges normal | wc -l)" = 1
-      - name: Lints
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Tests
-        run: cargo test --workspace --locked
-      - name: Docs
-        run: cargo doc --workspace --no-deps --locked
-
-  licences:
-    name: Licences and advisories
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check
-
   windows:
     name: Checks (Windows)
-    runs-on: windows-2022
-    timeout-minutes: 30
+    runs-on: [self-hosted, brush]
+    # Room for the gate's waits (up to 60 minutes each) on a busy day.
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
-      # GitHub's Windows runner has Microsoft's build tools, so this job builds
-      # for the MSVC target: the same code, the ordinary Windows toolchain.
-      - name: Rust (the pinned toolchain)
-        run: rustup show active-toolchain || rustup toolchain install
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: windows-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+
+      # Idle priority for the rest of the job, then wait for gpubox to be free:
+      # no booking, no other Actions job, no agent's test run, 2 GB of memory.
+      - name: Yield to gpubox
+        shell: powershell
+        run: ./tools/ci/gpubox-gate.ps1 -Lower
+
+      # Builds for x86_64-pc-windows-gnullvm, linked by llvm-mingw (0011): the
+      # runner has no Microsoft build tools, so the MSVC target is not built.
+      - name: Toolchain (pinned)
+        shell: powershell
+        run: ./tools/ci/windows-toolchain.ps1
+
+      - name: Build environment (tools/env-windows.sh)
+        run: |
+          . tools/env-windows.sh
+          {
+            echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET"
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER"
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS"
+          } >> "$GITHUB_ENV"
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: brush-core depends on nothing
+        run: test "$(cargo tree -p brush-core --edges normal --locked | wc -l)" = 1
+
       - name: Lints
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      # No test opens a GPU or a window (docs/ENGINEERING.md): gpubox's card
+      # belongs to its GPU queue.
       - name: Tests
-        run: cargo test --workspace --locked
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
+          cargo test --workspace --locked
+
+      - name: Docs
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
+          cargo doc --workspace --no-deps --locked
+
       - name: The command-line tool builds
-        run: cargo build --release -p brush-cli --locked
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
+          cargo build --release -p brush-cli --locked
+
+      - name: Licences and advisories
+        run: cargo deny check
