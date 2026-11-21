@@ -29,6 +29,8 @@ impl Report {
         self.lines.push(line);
     }
 
+    /// Several lines at once: only the Windows commands (the overlay, the pen) have them.
+    #[cfg(windows)]
     pub fn lines(&mut self, lines: impl IntoIterator<Item = String>) {
         for line in lines {
             self.line(line);
