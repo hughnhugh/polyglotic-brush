@@ -31,6 +31,9 @@ Rust engine. Where this file is silent, that one holds.
 
 ## The checks (CI runs all of them)
 
+CI runs them on GitHub's machines, on Linux, Windows (the MSVC target and
+`gnullvm`) and macOS (`decisions/0014`); never on a runner of ours.
+
 | Check | Command |
 |---|---|
 | Format | `cargo fmt --all --check` |
@@ -40,6 +43,8 @@ Rust engine. Where this file is silent, that one holds.
 | `brush-core` has no dependencies | `cargo tree -p brush-core --edges normal` prints one line |
 | Licences and advisories | `cargo deny check` (`deny.toml`) |
 | The C header is current | part of the tests (`crates/brush-host/tests/header.rs`) |
+| Every `.rs` and `.wgsl` file carries the licence | its first two lines (`decisions/0013`) |
+| `THIRD_PARTY_NOTICES.md` is current | `tools/third-party-notices.py` (its first lines) |
 
 Tests that need a GPU or a screen don't run in CI yet: the commands in
 `docs/M0.md` are run by hand on real devices. Golden pictures on a software

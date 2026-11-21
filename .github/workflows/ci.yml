@@ -1,14 +1,11 @@
 name: CI
 
-# On our own runner: `gpubox-brush`, a service on the second PC (gpubox),
-# registered to this repository alone (docs/decisions/0012). GitHub's own
-# machines would cost money for a private repository, and the account's
-# spending limit is 0.
+# On GitHub's own machines, free for a public repository (docs/decisions/0014):
+# Linux, Windows (the MSVC target and gnullvm) and macOS.
 #
-# Linux is not checked. No Linux runner of ours exists yet, and this workflow
-# never asks for GitHub's paid machines. The checks that were Linux-only
-# (format, the dependency rule, docs, cargo-deny) run in the Windows job; a
-# Linux build and its tests wait for a runner we own.
+# Never on a self-hosted runner. Anyone can open a pull request here, and its
+# code would run on that machine. Pull requests run with the event's own
+# read-only token: one from a fork gets no secrets, and no step here uses one.
 on:
   pull_request:
   push:
@@ -24,51 +21,30 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   RUSTDOCFLAGS: -D warnings
-  # At most 4 compilers at once; every step from the gate on runs at Idle
-  # priority (tools/ci/gpubox-gate.ps1).
-  CARGO_BUILD_JOBS: 4
-  # The toolchain beside rust-toolchain.toml, installed into the runner's tool
-  # cache by tools/ci/windows-toolchain.ps1 and checked against these hashes.
-  RUSTUP_VERSION: 1.29.3
-  RUSTUP_INIT_SHA256: f6289656ce42e1099f3cbc6f10ef6321dfde54773faf599dd36fd3b1f07d9103
+  # Tools that aren't on GitHub's images, pinned, each download checked
+  # against its SHA-256 (the release's own digest on GitHub).
   LLVM_MINGW_RELEASE: "20261117"
   LLVM_MINGW_SHA256: 4d002e330a0f703625aa5ccbc37e96f8f824413e163bfc7336774aabd2c3a412
   CARGO_DENY_VERSION: 0.22.0
-  CARGO_DENY_SHA256: a85b270b4aa28633d2cb2be97fccd4518ccb783014914e99463e75468cb3183c
+  CARGO_DENY_SHA256: 98c56e6a408bfa5c3c60744b6015aaa6aa08f743fdeb88386d06fca035bb1786
 
 jobs:
-  windows:
-    name: Checks (Windows)
-    runs-on: [self-hosted, brush]
-    # Room for the gate's waits (up to 60 minutes each) on a busy day.
-    timeout-minutes: 150
-    defaults:
-      run:
-        shell: bash
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      # Idle priority for the rest of the job, then wait for gpubox to be free:
-      # no booking, no other Actions job, no agent's test run, 2 GB of memory.
-      - name: Yield to gpubox
-        shell: powershell
-        run: ./tools/ci/gpubox-gate.ps1 -Lower
-
-      # Builds for x86_64-pc-windows-gnullvm, linked by llvm-mingw (0011): the
-      # runner has no Microsoft build tools, so the MSVC target is not built.
-      - name: Toolchain (pinned)
-        shell: powershell
-        run: ./tools/ci/windows-toolchain.ps1
-
-      - name: Build environment (tools/env-windows.sh)
+      # GitHub's images carry rustup; rust-toolchain.toml says which Rust.
+      - name: Toolchain (rust-toolchain.toml)
         run: |
-          . tools/env-windows.sh
-          {
-            echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET"
-            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER"
-            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS"
-          } >> "$GITHUB_ENV"
+          rustup toolchain install
+          rustc --version
 
       - name: Format
         run: cargo fmt --all --check
@@ -77,26 +53,125 @@ jobs:
         run: test "$(cargo tree -p brush-core --edges normal --locked | wc -l)" = 1
 
       - name: Lints
-        run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
-          cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      # No test opens a GPU or a window (docs/ENGINEERING.md): gpubox's card
-      # belongs to its GPU queue.
+      - name: Build
+        run: cargo build --workspace --locked
+
+      # No test opens a GPU or a window (docs/ENGINEERING.md).
       - name: Tests
-        run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
-          cargo test --workspace --locked
+        run: cargo test --workspace --locked
 
       - name: Docs
-        run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
-          cargo doc --workspace --no-deps --locked
+        run: cargo doc --workspace --no-deps --locked
 
-      - name: The command-line tool builds
+      - name: cargo-deny (pinned)
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/ci/gpubox-gate.ps1
-          cargo build --release -p brush-cli --locked
+          name="cargo-deny-$CARGO_DENY_VERSION-x86_64-unknown-linux-musl"
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/$name.tar.gz" \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/$name.tar.gz"
+          echo "$CARGO_DENY_SHA256  $RUNNER_TEMP/$name.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
 
       - name: Licences and advisories
         run: cargo deny check
+
+      # docs/decisions/0013: every Rust and WGSL file says it is Apache-2.0.
+      - name: Every source file carries the licence
+        run: |
+          missing="$(git ls-files '*.rs' '*.wgsl' | while read -r f; do
+            head -n 2 "$f" | grep -qx '// SPDX-License-Identifier: Apache-2.0' || echo "$f"
+          done)"
+          if [ -n "$missing" ]; then echo "No licence header in:"; echo "$missing"; exit 1; fi
+
+      - name: THIRD_PARTY_NOTICES.md is current
+        run: |
+          mkdir -p build
+          cargo deny list --format json --layout crate > build/deny-list.json
+          cargo metadata --format-version 1 --locked > build/metadata.json
+          python3 tools/third-party-notices.py build/deny-list.json build/metadata.json > build/notices.md
+          diff -u THIRD_PARTY_NOTICES.md build/notices.md ||
+            { echo "Stale: write it again with tools/third-party-notices.py (its first lines say how)"; exit 1; }
+
+  windows:
+    name: Windows (${{ matrix.target }})
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # MSVC: GitHub's images carry Microsoft's build tools, and it is the
+        # target the app will ship (0011). gnullvm with llvm-mingw: how a PC
+        # without those tools builds (0011, tools/env-windows.sh).
+        target: [x86_64-pc-windows-msvc, x86_64-pc-windows-gnullvm]
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          rustup toolchain install
+          rustup target add "$CARGO_BUILD_TARGET"
+          rustc --version
+
+      - name: llvm-mingw (pinned) and tools/env-windows.sh
+        if: matrix.target == 'x86_64-pc-windows-gnullvm'
+        run: |
+          name="llvm-mingw-$LLVM_MINGW_RELEASE-ucrt-x86_64"
+          temp="$(cygpath -u "$RUNNER_TEMP")"
+          curl -sSfL --retry 3 -o "$temp/$name.zip" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/$LLVM_MINGW_RELEASE/$name.zip"
+          echo "$LLVM_MINGW_SHA256  $temp/$name.zip" | sha256sum -c -
+          "$(cygpath -u "$SYSTEMROOT")/System32/tar.exe" -xf "$(cygpath -w "$temp/$name.zip")" -C "$(cygpath -w "$temp")"
+          export LLVM_MINGW="$temp/$name"
+          . tools/env-windows.sh
+          {
+            echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET"
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER"
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS=$CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS"
+          } >> "$GITHUB_ENV"
+
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace --locked
+
+      - name: Docs
+        run: cargo doc --workspace --no-deps --locked
+
+      - name: The command-line tool and the DLL build (release)
+        run: cargo build --release -p brush-cli -p brush-host --locked
+
+  macos:
+    name: macOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          rustup toolchain install
+          rustc --version
+
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Build
+        run: cargo build --workspace --locked
+
+      - name: Tests
+        run: cargo test --workspace --locked
+
+      - name: Docs
+        run: cargo doc --workspace --no-deps --locked

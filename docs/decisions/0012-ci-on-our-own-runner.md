@@ -1,6 +1,6 @@
 # 0012 CI runs on our own runner on gpubox, building `gnullvm`; Linux waits
 
-- **Status:** accepted
+- **Status:** superseded by 0014 (2026-11-21: the repository went public, and CI moved to GitHub's machines)
 - **Date:** 2026-11-21
 - **Decided by:** Claude (polyglotic-hq DECISIONS #253, reversible), built by polyglotic-hq project 582, 2026-11-21
 
