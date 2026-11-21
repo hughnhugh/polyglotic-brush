@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 //
 // The look pass: the picture of the ink on the paper, lit from a height field
 // (Hertzmann 2002; Baxter et al., "IMPaSTo", 2004).

@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! The picture. Two looks in M0:
 //! - [`LitPaper`]: the simulated ink over its paper, lit from a height field;

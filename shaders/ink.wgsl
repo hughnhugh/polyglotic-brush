@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 //
 // M0's pointer ink: a stroke's ribbon of triangles, drawn straight to the
 // window with premultiplied alpha. No simulation (the plan's section 5:

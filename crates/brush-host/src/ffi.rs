@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! The C interface (`include/brush_host.h`, written by cbindgen; a test fails
 //! when the header is stale).

@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! Arithmetic on measured times. The clock belongs to the caller: this only
 //! holds the numbers, so a gate is judged the same way everywhere.

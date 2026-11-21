@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 //
 // The flow pass: water and pigment in the paper, one fixed step, over the
 // WHOLE canvas. Never a region that follows the brush (docs/decisions/0004).

@@ -22,9 +22,8 @@ allow = [
 # cbindgen (MPL-2.0) writes the C header in a test. It is a dev-dependency,
 # which cargo-deny leaves out: no part of it is in the engine that ships.
 
-# Our own crates carry no SPDX licence: they are not published.
-[licenses.private]
-ignore = true
+# Our own crates are checked too: each must carry Apache-2.0 (Cargo.toml's
+# workspace licence, docs/decisions/0013), which is on the list above.
 
 [bans]
 multiple-versions = "allow"

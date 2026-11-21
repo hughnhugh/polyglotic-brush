@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! The canvas on Windows: a frameless, transparent window of its own, owned
 //! by the host's window, drawn through a DirectComposition swap chain

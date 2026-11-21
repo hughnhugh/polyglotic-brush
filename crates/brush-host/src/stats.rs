@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! What a canvas measured about itself. Numbers only: nothing drawn or
 //! written is kept here.

@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! `include/brush_host.h` is what `src/ffi.rs` says it is.
 //!
@@ -13,7 +14,7 @@ fn the_header_is_current() {
     let config = cbindgen::Config {
         language: cbindgen::Language::C,
         include_guard: Some("POLYGLOTIC_BRUSH_HOST_H".into()),
-        header: Some("/* Copyright (c) 2026 Polyglotic. All rights reserved. */\n/* Written by cbindgen from crates/brush-host/src/ffi.rs. Don't edit. */".into()),
+        header: Some("/* Copyright 2026 Polyglotic. SPDX-License-Identifier: Apache-2.0 */\n/* Written by cbindgen from crates/brush-host/src/ffi.rs. Don't edit. */".into()),
         cpp_compat: true,
         documentation: true,
         ..Default::default()

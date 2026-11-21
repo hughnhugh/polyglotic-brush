@@ -9,6 +9,11 @@ Polyglotic's canvas engine (Rust, wgpu). Read `ARCHITECTURE.md` and
   bristle physics on a second processor (`0005`). Don't add a tile, an active
   area or a dirty rectangle to the simulation, even as an optimisation.
 - **`brush-core` has no dependencies.** Don't add one.
+- **The repository is public, under Apache-2.0** (`docs/decisions/0013`):
+  nothing private in a file, a commit or a log - no names, emails, home
+  folders, tokens or hosts. A new `.rs` or `.wgsl` file starts with the two
+  licence lines the others have; a new dependency means re-running
+  `tools/third-party-notices.py` (CI checks both).
 - **Pull requests only;** never push to `main`, never force-push, never
   `--no-verify`. One concern per pull request; say what was tested and what
   wasn't.

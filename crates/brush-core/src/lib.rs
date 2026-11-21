@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! Strokes as data: pen samples, the geometry made from them, and the
 //! arithmetic on timings. Plain Rust: no GPU, no I/O and no clock, so every

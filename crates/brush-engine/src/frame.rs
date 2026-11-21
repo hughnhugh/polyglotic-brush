@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! What is drawn each frame. M0: pointer ink over a clear (transparent)
 //! target, and, when asked, the simulation stepping beside it so its cost is

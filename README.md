@@ -2,7 +2,7 @@
 
 Polyglotic's canvas engine: brush strokes as data, re-made into ink on paper
 by a simulation that runs on the learner's own device. Rust on wgpu, shaders
-in WGSL. Private.
+in WGSL. Open source, under the Apache License 2.0.
 
 It is at **M0**: the repository, and the measurements that say whether the
 plan holds - a transparent canvas over the caption window, the simulation's
@@ -67,3 +67,12 @@ A host app loads `brush_host.dll` and calls the functions in
 `include/brush_host.h` (written by cbindgen; a test keeps it current). From
 Python, `ctypes.CDLL` is enough: polyglotic-hq's
 `projects/545-the-brush-engine-m0/work/owner545.py` does it from a Qt app.
+
+## Licence
+
+Apache License 2.0: [LICENSE](LICENSE) and [NOTICE](NOTICE)
+(`docs/decisions/0013`). Each source file says so in its first lines, and CI
+checks that every one does. The crates the engine is built from keep their
+own licences, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md),
+which CI keeps current. Stroke data, when it comes, is separate files under
+their own licences (`docs/decisions/0009`).

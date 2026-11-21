@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! `brush`: the engine from the command line. M0's commands measure; they
 //! write numbers and adapter names, and nothing about the person or the PC.

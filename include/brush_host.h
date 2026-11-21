@@ -1,4 +1,4 @@
-/* Copyright (c) 2026 Polyglotic. All rights reserved. */
+/* Copyright 2026 Polyglotic. SPDX-License-Identifier: Apache-2.0 */
 /* Written by cbindgen from crates/brush-host/src/ffi.rs. Don't edit. */
 
 #ifndef POLYGLOTIC_BRUSH_HOST_H

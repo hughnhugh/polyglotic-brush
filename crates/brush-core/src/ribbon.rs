@@ -1,4 +1,5 @@
-// Copyright (c) 2026 Polyglotic. All rights reserved.
+// Copyright 2026 Polyglotic
+// SPDX-License-Identifier: Apache-2.0
 
 //! M0's mark: a stroke's samples as a ribbon of triangles, its width following
 //! pressure. It stands in for the brush footprint until M1; nothing is
